@@ -143,7 +143,6 @@ fn main() {
 
     // Set main brightness
     let bright_frame = encode_bright_frame(0x28);
-    //println!("BRIGHT: {:02X?}", bright_frame);
     iface
         .send(&bright_frame)
         .expect("Could not send brightness packet");
@@ -164,32 +163,20 @@ fn main() {
         yuv::yuv422_to_rgb24(buf, &mut rgb24);
         println!("RGB size: {}", rgb24.len());
 
-        let (frame_x, frame_y) = (640usize, 480usize);
+        let (frame_x, frame_y) = (640u32, 480u32);
         let (res_x, res_y) = (128u16, 128u16);
-        // Center of the image
-        let (offset_x, offset_y) = (
-            (frame_x - res_x as usize) / 2,
-            (frame_y - res_y as usize) / 2,
-        );
-        let image: Vec<u8> = rgb24
-            .into_iter()
-            .enumerate()
-            // We currently have 3 bytes per pixel, and 640x480 pixels
-            // We want to take the 128x128 square on the upper left + pixel shift
-            .filter(|&(pix, _)| {
-                let pix_coord_x = (pix / 3) % frame_x;
-                let pix_coord_y = (pix / 3) / frame_x;
-                let in_col =
-                    (pix_coord_x >= offset_x) && (pix_coord_x < (offset_x + res_x as usize));
-                let in_row = (pix_coord_y >= offset_y) && (pix_coord_y < offset_y + res_y as usize);
-                in_col && in_row
-            })
-            .map(|(_, v)| v)
-            .collect();
+        let image = image::RgbImage::from_raw(frame_x, frame_y, rgb24.clone()).unwrap();
+        let image = image::imageops::resize(
+            &image,
+            res_x as u32,
+            res_y as u32,
+            image::imageops::FilterType::Nearest,
+        )
+        .into_flat_samples()
+        .samples;
         println!("Frame size: {}", image.len());
 
         // Now send the stream!
-
         let bright_frame = encode_bright_frame(0x28);
         iface
             .send(&bright_frame)
@@ -211,18 +198,14 @@ fn main() {
             frame.extend_from_slice(&image[pixel_start..pixel_stop]);
 
             // Send it
-            //println!("ROW {}: {:02X?}", row, frame);
             iface.send(&frame).expect("Could not send row");
         }
+        // Wait a little bit before displaying the frames so that the FPGA can
+        // store the last row in buffer, to avoid flickering
+        std::thread::sleep(std::time::Duration::from_millis(5));
 
         // Finally, display it!
         let disp_frame = encode_disp_frame(0x03);
-        //println!("DISP: {:02X?}", disp_frame);
         iface.send(&disp_frame).expect("Could not send row");
-
-        //let mut previous_frame = std::time::Instant::now();
-        //std::thread::sleep(std::time::Duration::from_secs(10));
     }
-
-    //stream.stop();
 }
