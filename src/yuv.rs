@@ -60,9 +60,11 @@ fn ycbcr_to_rgb(y: u8, cb: u8, cr: u8) -> (u8, u8, u8) {
     // let r = (ycbcr * f32x4::from_array([1.0, 0.00000, 1.5748, 0.0])).horizontal_sum();
     // let g = (ycbcr * f32x4::from_array([1.0, -0.187324, -0.468124, 0.0])).horizontal_sum();
     // let b = (ycbcr * f32x4::from_array([1.0, 1.8556, 0.00000, 0.0])).horizontal_sum();
-    let r = (y as f32) + 1.5748f32 * (cr as f32 - 128.0f32);
-    let g = (y as f32) - 0.187324f32 * (cb as f32 - 128.0f32) - 0.468124f32 * (cr as f32);
-    let b = (y as f32) + 1.8556f32 * (cb as f32 - 128.0f32);
+    let r = (y as f32 - 16.0f32) + 1.5748f32 * (cr as f32 - 128.0f32);
+    let g = (y as f32 - 16.0f32)
+        - 0.187324f32 * (cb as f32 - 128.0f32)
+        - 0.468124f32 * (cr as f32 - 128.0f32);
+    let b = (y as f32 - 16.0f32) + 1.8556f32 * (cb as f32 - 128.0f32);
 
     (clamp(r), clamp(g), clamp(b))
 }

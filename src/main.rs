@@ -92,6 +92,29 @@ fn generate_test_pattern(size_x: usize, size_y: usize, it: u32) -> Vec<u8> {
     pattern
 }
 
+fn resize_image_with_cropping(
+    mut src_view: fast_image_resize::DynamicImageView,
+    dst_width: std::num::NonZeroU32,
+    dst_height: std::num::NonZeroU32,
+) -> fast_image_resize::Image {
+    // Set cropping parameters
+    src_view.set_crop_box_to_fit_dst_size(dst_width, dst_height, None);
+
+    // Create container for data of destination image
+    let mut dst_image = fast_image_resize::Image::new(dst_width, dst_height, src_view.pixel_type());
+    // Get mutable view of destination image data
+    let mut dst_view = dst_image.view_mut();
+
+    // Create Resizer instance and resize source image
+    // into buffer of destination image
+    let mut resizer = fast_image_resize::Resizer::new(fast_image_resize::ResizeAlg::Convolution(
+        fast_image_resize::FilterType::Lanczos3,
+    ));
+    resizer.resize(&src_view, &mut dst_view).unwrap();
+
+    dst_image
+}
+
 fn main() {
     // This part is very std/Hosted platform specific
     let lib = rawsock::open_best_library().expect("Could not open any packet capturing library");
@@ -163,17 +186,30 @@ fn main() {
         yuv::yuv422_to_rgb24(buf, &mut rgb24);
         println!("RGB size: {}", rgb24.len());
 
-        let (frame_x, frame_y) = (640u32, 480u32);
-        let (res_x, res_y) = (128u16, 128u16);
-        let image = image::RgbImage::from_raw(frame_x, frame_y, rgb24.clone()).unwrap();
-        let image = image::imageops::resize(
-            &image,
-            res_x as u32,
-            res_y as u32,
-            image::imageops::FilterType::Nearest,
+        let (res_x, res_y) = (256u16, 64u16);
+        let mut image = fast_image_resize::Image::from_vec_u8(
+            std::num::NonZeroU32::new(fmt.width).unwrap(),
+            std::num::NonZeroU32::new(fmt.height).unwrap(),
+            rgb24.clone(),
+            fast_image_resize::PixelType::U8x3,
         )
-        .into_flat_samples()
-        .samples;
+        .unwrap();
+
+        // Linearize colospace before resizing
+        let srgb_to_linear = fast_image_resize::create_srgb_mapper();
+        srgb_to_linear
+            .forward_map_inplace(&mut image.view_mut())
+            .unwrap();
+        let mut image = resize_image_with_cropping(
+            image.view(),
+            std::num::NonZeroU32::new(res_x as u32).unwrap(),
+            std::num::NonZeroU32::new(res_y as u32).unwrap(),
+        );
+        srgb_to_linear
+            .backward_map_inplace(&mut image.view_mut())
+            .unwrap();
+        let image = image.buffer();
+
         println!("Frame size: {}", image.len());
 
         // Now send the stream!
