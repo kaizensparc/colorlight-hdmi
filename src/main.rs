@@ -141,6 +141,7 @@ fn main() {
         .send(&encode_recv_frame())
         .expect("Could not send discovery packet");
 
+    let (res_x, res_y): (usize, usize);
     loop {
         let packet = iface.receive().expect("Could not receive packet");
         // Check dst mac is ff:ff:ff:ff:ff:ff, src mac is RECV_MAC and frame header is 0x0805
@@ -150,8 +151,8 @@ fn main() {
             && packet[12..14].starts_with(&[0x08, 0x05])
         {
             let fw = format!("{}.{}", packet[15], packet[16]);
-            let res_x = packet[34] as u16 * 256 + packet[35] as u16;
-            let res_y = packet[36] as u16 * 256 + packet[37] as u16;
+            res_x = packet[34] as usize * 256 + packet[35] as usize;
+            res_y = packet[36] as usize * 256 + packet[37] as usize;
             let chain = packet[112];
             //println!("len: {}, packet: {:02X?}", packet.len(), packet);
             println!(
@@ -161,6 +162,9 @@ fn main() {
             break;
         }
     }
+    // We have two receivers in the chain, but cf. next chapter-comment, we have
+    // to manually set the real displayed size
+    let res_x = 640;
 
     // Set main brightness
     let bright_frame = encode_bright_frame(0x28);
@@ -184,7 +188,6 @@ fn main() {
         yuv::yuv422_to_rgb24(buf, &mut rgb24);
         println!("RGB size: {}", rgb24.len());
 
-        let (res_x, res_y) = (256u16, 64u16);
         let mut image = fast_image_resize::Image::from_vec_u8(
             std::num::NonZeroU32::new(fmt.width).unwrap(),
             std::num::NonZeroU32::new(fmt.height).unwrap(),
@@ -211,35 +214,78 @@ fn main() {
         println!("Frame size: {}", image.len());
 
         // Now send the stream!
-        let bright_frame = encode_bright_frame(0x28);
-        iface
-            .send(&bright_frame)
-            .expect("Could not send brightness packet");
-
         for row in 0..res_y {
-            let mut frame = vec![];
-            frame.extend_from_slice(&RECV_MAC);
-            frame.extend_from_slice(&SEND_MAC);
-            frame.push(0x55);
-            frame.extend_from_slice(&row.to_be_bytes());
-            // Pixel offset :thinking:
-            frame.extend_from_slice(&[0u8; 2]);
-            frame.extend_from_slice(&res_x.to_be_bytes());
-            frame.extend_from_slice(&[0x08, 0x88]);
-
             let pixel_start = (row * res_x * 3) as usize;
             let pixel_stop = ((row + 1) * res_x * 3) as usize;
-            frame.extend_from_slice(&image[pixel_start..pixel_stop]);
+            let line = &image[pixel_start..pixel_stop];
 
-            // Send it
-            iface.send(&frame).expect("Could not send row");
+            // THIS PART IS VERY SPECIFIC TO OUR SCREEN
+            // Due to a firmware bug in the colorlight cards, we could not set the cabinet size to its real
+            // size (glitching)
+            // So instead of making a 320x128 cabinet size we set a 512x128, two split.
+            // This means there are pixels we don't use in the frames we send (yes, it's a shame...)
+            // - There are 128 pixels in the first split, 192 pixels in the later
+            // - The left side is not displayed
+            // That means the screen looks like this:
+            //
+            // 256 pixels for the first split, composed of 128 blank, 128 displayed
+            // 256 pixels for the later split, composed of 64 blank, 192 displayed
+            //
+            // In practice the image we made before has the right size to display,
+            // so we'll just need to send 128 blank pixels first, and then 64 others.
+
+            let mut chunk_offset = 0;
+            // To keep the frame under the usual 1500 MTU, we send chunks
+            // We can't use chunks() method because the taken chunk size varies
+            for ch in 0..3 {
+                let mut frame = vec![];
+                let nb_pixels_in_chunk = if ch < 2 { 497 } else { 130 };
+                frame.extend_from_slice(&RECV_MAC);
+                frame.extend_from_slice(&SEND_MAC);
+                frame.extend_from_slice(&[0x55, 0x00]);
+                frame.extend_from_slice(&(row as u8).to_be_bytes());
+                frame.extend_from_slice(&(chunk_offset as u16).to_be_bytes());
+                frame.extend_from_slice(&(nb_pixels_in_chunk as u16).to_be_bytes());
+                frame.extend_from_slice(&[0x08, 0x88]);
+
+                match ch {
+                    // 128 blank, 128 displayed, 64 blank, 177 (cut for MTU)
+                    0 => {
+                        frame.extend_from_slice(&[0u8; 128 * 3]);
+                        frame.extend_from_slice(&line[0..128 * 3]);
+                        frame.extend_from_slice(&[0u8; 64 * 3]);
+                        frame.extend_from_slice(&line[128 * 3..305 * 3]);
+                    }
+                    // 15 displayed, 128 blank, 128 displayed, 64 blank, 162 displayed
+                    1 => {
+                        frame.extend_from_slice(&line[305 * 3..320 * 3]);
+                        frame.extend_from_slice(&[0u8; 128 * 3]);
+                        frame.extend_from_slice(&line[320 * 3..448 * 3]);
+                        frame.extend_from_slice(&[0u8; 64 * 3]);
+                        frame.extend_from_slice(&line[448 * 3..610 * 3]);
+                    }
+                    // 130 displayed
+                    2 => {
+                        frame.extend_from_slice(&line[610 * 3..640 * 3]);
+                    }
+                    _ => unreachable!(),
+                }
+
+                chunk_offset += nb_pixels_in_chunk;
+
+                //println!("{:x?}, len {}", frame, frame.len() - 14);
+                // Send it
+                iface.send(&frame).expect("Could not send row");
+            }
         }
         // Wait a little bit before displaying the frames so that the FPGA can
         // store the last row in buffer, to avoid flickering
         std::thread::sleep(std::time::Duration::from_millis(5));
 
         // Finally, display it!
-        let disp_frame = encode_disp_frame(0x03);
-        iface.send(&disp_frame).expect("Could not send row");
+        let disp_frame = encode_disp_frame(0xff);
+        iface
+            .send(&disp_frame)
+            .expect("Could not send frame display");
     }
 }
