@@ -48,9 +48,9 @@ fn encode_disp_frame(brightness: u8) -> Vec<u8> {
     frame.extend_from_slice(&RECV_MAC);
     frame.extend_from_slice(&SEND_MAC);
     frame.extend_from_slice(&DISP_HDR);
-    frame.extend_from_slice(&[0u8; 11]);
-    frame.extend_from_slice(&[brightness, 0x05, brightness, brightness, brightness]);
-    frame.extend_from_slice(&[0u8; 73]);
+    frame.extend_from_slice(&[0u8; 21]);
+    frame.extend_from_slice(&[brightness, 0x05, 0x00, brightness, brightness, brightness]);
+    frame.extend_from_slice(&[0u8; 71]);
 
     frame
 }
