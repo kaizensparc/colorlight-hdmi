@@ -107,9 +107,7 @@ fn resize_image_with_cropping(
 
     // Create Resizer instance and resize source image
     // into buffer of destination image
-    let mut resizer = fast_image_resize::Resizer::new(fast_image_resize::ResizeAlg::Convolution(
-        fast_image_resize::FilterType::Lanczos3,
-    ));
+    let mut resizer = fast_image_resize::Resizer::new(fast_image_resize::ResizeAlg::Nearest);
     resizer.resize(&src_view, &mut dst_view).unwrap();
 
     dst_image
