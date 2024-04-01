@@ -117,14 +117,14 @@ fn main() {
     // This part is very std/Hosted platform specific
     let lib = rawsock::open_best_library().expect("Could not open any packet capturing library");
     println!("Using socket packet capture library: {}", lib.version());
-    let iface = "ens33";
+    let iface = "enp6s0f4u2c2";
     let mut iface = lib
         .open_interface(&iface)
         .expect("Could not open network interface");
     println!("Interface opened, data link: {}", iface.data_link());
 
     // Open HDMI capture device
-    let mut dev = Device::new(0).expect("Failed to open device");
+    let mut dev = Device::with_path("/dev/video6").expect("Failed to open device");
 
     // Set format
     let mut fmt = dev.format().expect("Failed to read format");
