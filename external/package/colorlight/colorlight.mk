@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-COLORLIGHT_VERSION = d94bb9ad69f59298f3a96793ab70366866ec4607
+COLORLIGHT_VERSION = c0ad1afd81b89b03166158c43070b57b3ef389a0
 COLORLIGHT_SITE_METHOD = git
 COLORLIGHT_SITE = https://github.com/kaizensparc/colorlight-hdmi.git
 COLORLIGHT_SUBDIR = colorlight

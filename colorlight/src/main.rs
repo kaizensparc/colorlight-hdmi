@@ -125,12 +125,12 @@ fn main() {
     let lib = rawsock::open_best_library().expect("Could not open any packet capturing library");
     log::info!("Using socket packet capture library: {}", lib.version());
     let mut iface = lib
-        .open_interface("enp6s0f4u2c2")
+        .open_interface("eth0")
         .expect("Could not open network interface");
     log::info!("Interface opened, data link: {}", iface.data_link());
 
     // Open HDMI capture device
-    let mut dev = Device::with_path("/dev/video6").expect("Failed to open device");
+    let mut dev = Device::with_path("/dev/video0").expect("Failed to open device");
 
     // Set format
     let mut fmt = dev.format().expect("Failed to read format");
