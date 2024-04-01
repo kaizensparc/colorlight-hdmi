@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 fast_image_resize = "2.7.3"
+log = "^0.4"
+log-panics = { version = "2", features = ["with-backtrace"]}
 rawsock = "0.3.0"
 rayon = "1.8.0"
+syslog = "^6"
 v4l = "0.14.0"

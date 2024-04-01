@@ -114,14 +114,20 @@ fn resize_image_with_cropping(
 }
 
 fn main() {
+    syslog::init(
+        syslog::Facility::LOG_USER,
+        log::LevelFilter::Debug,
+        Some("Colorlight"),
+    )
+    .expect("Could not initialize syslog logger");
+
     // This part is very std/Hosted platform specific
     let lib = rawsock::open_best_library().expect("Could not open any packet capturing library");
-    println!("Using socket packet capture library: {}", lib.version());
-    let iface = "enp6s0f4u2c2";
+    log::info!("Using socket packet capture library: {}", lib.version());
     let mut iface = lib
-        .open_interface(&iface)
+        .open_interface("enp6s0f4u2c2")
         .expect("Could not open network interface");
-    println!("Interface opened, data link: {}", iface.data_link());
+    log::info!("Interface opened, data link: {}", iface.data_link());
 
     // Open HDMI capture device
     let mut dev = Device::with_path("/dev/video6").expect("Failed to open device");
@@ -132,17 +138,17 @@ fn main() {
     fmt.height = 480;
     fmt.fourcc = FourCC::new(b"YUYV");
     let fmt = dev.set_format(&fmt).expect("Failed to write format");
-    println!("Format in use:\n{}", fmt);
+    log::info!("Format in use:\n{}", fmt);
 
     // Try to detect the colorlight card
-    println!("Looking for a colorlight card");
-
-    iface
-        .send(&encode_recv_frame())
-        .expect("Could not send discovery packet");
+    log::info!("Looking for a colorlight card");
 
     let (res_x, res_y): (usize, usize);
     loop {
+        iface
+            .send(&encode_recv_frame())
+            .expect("Could not send discovery packet");
+
         let packet = iface.receive().expect("Could not receive packet");
         // Check dst mac is ff:ff:ff:ff:ff:ff, src mac is RECV_MAC and frame header is 0x0805
         if packet.len() >= 112
@@ -154,10 +160,13 @@ fn main() {
             res_x = packet[34] as usize * 256 + packet[35] as usize;
             res_y = packet[36] as usize * 256 + packet[37] as usize;
             let chain = packet[112];
-            //println!("len: {}, packet: {:02X?}", packet.len(), packet);
-            println!(
+            //log::debug!("len: {}, packet: {:02X?}", packet.len(), packet);
+            log::info!(
                 "Detected colorlight card 5A, fw: {}, res: {}x{}, chain number: {}",
-                fw, res_x, res_y, chain
+                fw,
+                res_x,
+                res_y,
+                chain
             );
             break;
         }
@@ -178,7 +187,7 @@ fn main() {
 
     loop {
         let (buf, meta) = stream.next().unwrap();
-        println!(
+        log::debug!(
             "Buffer size: {}, seq: {}, timestamp: {}",
             buf.len(),
             meta.sequence,
@@ -186,7 +195,7 @@ fn main() {
         );
         let mut rgb24 = vec![0x00; (buf.len() as f32 * 1.5) as usize];
         yuv::yuv422_to_rgb24(buf, &mut rgb24);
-        println!("RGB size: {}", rgb24.len());
+        log::debug!("RGB size: {}", rgb24.len());
 
         let mut image = fast_image_resize::Image::from_vec_u8(
             std::num::NonZeroU32::new(fmt.width).unwrap(),
@@ -211,7 +220,7 @@ fn main() {
             .unwrap();
         let image = image.buffer();
 
-        println!("Frame size: {}", image.len());
+        log::debug!("Frame size: {}", image.len());
 
         // Now send the stream!
         for row in 0..res_y {
@@ -273,7 +282,7 @@ fn main() {
 
                 chunk_offset += nb_pixels_in_chunk;
 
-                //println!("{:x?}, len {}", frame, frame.len() - 14);
+                //log::debug!("{:x?}, len {}", frame, frame.len() - 14);
                 // Send it
                 iface.send(&frame).expect("Could not send row");
             }
