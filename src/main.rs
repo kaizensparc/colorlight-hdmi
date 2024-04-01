@@ -167,7 +167,7 @@ fn main() {
     let res_x = 640;
 
     // Set main brightness
-    let bright_frame = encode_bright_frame(0x28);
+    let bright_frame = encode_bright_frame(0xff);
     iface
         .send(&bright_frame)
         .expect("Could not send brightness packet");
@@ -184,7 +184,7 @@ fn main() {
             meta.sequence,
             meta.timestamp
         );
-        let mut rgb24 = vec![0; (buf.len() as f32 * 1.5) as usize];
+        let mut rgb24 = vec![0x00; (buf.len() as f32 * 1.5) as usize];
         yuv::yuv422_to_rgb24(buf, &mut rgb24);
         println!("RGB size: {}", rgb24.len());
 
