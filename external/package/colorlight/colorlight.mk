@@ -4,14 +4,9 @@
 #
 ################################################################################
 
-COLORLIGHT_VERSION = c0ad1afd81b89b03166158c43070b57b3ef389a0
+COLORLIGHT_VERSION = 4d3e6018d08e341d465f8f4b85de437a535a4ed4
 COLORLIGHT_SITE_METHOD = git
 COLORLIGHT_SITE = https://github.com/kaizensparc/colorlight-hdmi.git
 COLORLIGHT_SUBDIR = colorlight
-
-define COLORLIGHT_INSTALL_INIT_SYSV
-	$(INSTALL) -D -m 0755 $(BR2_EXTERNAL_COLORLIGHT_PATH)/package/colorlight/S99colorlight \
-		$(TARGET_DIR)/etc/init.d/S99colorlight
-endef
 
 $(eval $(cargo-package))
