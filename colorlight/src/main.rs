@@ -143,37 +143,38 @@ fn main() {
     // Try to detect the colorlight card
     log::info!("Looking for a colorlight card");
 
-    let (res_x, res_y): (usize, usize);
-    loop {
-        iface
-            .send(&encode_recv_frame())
-            .expect("Could not send discovery packet");
+    // let (res_x, res_y): (usize, usize);
+    // loop {
+    //     iface
+    //         .send(&encode_recv_frame())
+    //         .expect("Could not send discovery packet");
 
-        let packet = iface.receive().expect("Could not receive packet");
-        // Check dst mac is ff:ff:ff:ff:ff:ff, src mac is RECV_MAC and frame header is 0x0805
-        if packet.len() >= 112
-            && packet.starts_with(&[0xffu8; 6])
-            && packet[6..12].starts_with(&RECV_MAC)
-            && packet[12..14].starts_with(&[0x08, 0x05])
-        {
-            let fw = format!("{}.{}", packet[15], packet[16]);
-            res_x = packet[34] as usize * 256 + packet[35] as usize;
-            res_y = packet[36] as usize * 256 + packet[37] as usize;
-            let chain = packet[112];
-            //log::debug!("len: {}, packet: {:02X?}", packet.len(), packet);
-            log::info!(
-                "Detected colorlight card 5A, fw: {}, res: {}x{}, chain number: {}",
-                fw,
-                res_x,
-                res_y,
-                chain
-            );
-            break;
-        }
-    }
+    //     let packet = iface.receive().expect("Could not receive packet");
+    //     // Check dst mac is ff:ff:ff:ff:ff:ff, src mac is RECV_MAC and frame header is 0x0805
+    //     if packet.len() >= 112
+    //         && packet.starts_with(&[0xffu8; 6])
+    //         && packet[6..12].starts_with(&RECV_MAC)
+    //         && packet[12..14].starts_with(&[0x08, 0x05])
+    //     {
+    //         let fw = format!("{}.{}", packet[15], packet[16]);
+    //         res_x = packet[34] as usize * 256 + packet[35] as usize;
+    //         res_y = packet[36] as usize * 256 + packet[37] as usize;
+    //         let chain = packet[112];
+    //         //log::debug!("len: {}, packet: {:02X?}", packet.len(), packet);
+    //         log::info!(
+    //             "Detected colorlight card 5A, fw: {}, res: {}x{}, chain number: {}",
+    //             fw,
+    //             res_x,
+    //             res_y,
+    //             chain
+    //         );
+    //         break;
+    //     }
+    // }
     // We have two receivers in the chain, but cf. next chapter-comment, we have
     // to manually set the real displayed size
     let res_x = 640;
+    let res_y = 128;
 
     // Set main brightness
     let bright_frame = encode_bright_frame(0xff);
